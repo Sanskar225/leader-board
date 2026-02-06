@@ -1,4 +1,3 @@
-// src/server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -9,6 +8,10 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Import configurations
+const connectDB = require('./config/database');
+const CronService = require('./services/CronService');
+
 // Middleware
 app.use(helmet());
 app.use(cors());
@@ -17,12 +20,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/coderanker', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-})
-.then(() => console.log('✅ MongoDB Connected'))
-.catch(err => console.error('❌ MongoDB Connection Error:', err));
+connectDB();
+
+// Import and use routes
+const routes = require('./routes');
+app.use('/api', routes);
 
 // Basic route
 app.get('/', (req, res) => {
@@ -46,6 +48,11 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Start cron jobs (only in production or explicitly enabled)
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_CRON === 'true') {
+    CronService.start();
+}
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -61,9 +68,22 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-module.exports = app; // For testing
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    CronService.stop();
+    server.close(() => {
+        console.log('HTTP server closed');
+        mongoose.connection.close(false, () => {
+            console.log('MongoDB connection closed');
+            process.exit(0);
+        });
+    });
+});
+
+module.exports = app;
