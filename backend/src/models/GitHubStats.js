@@ -1,3 +1,4 @@
+// src/models/GitHubStats.js - UPDATED
 const mongoose = require('mongoose');
 
 const GitHubStatsSchema = new mongoose.Schema({
@@ -51,6 +52,8 @@ const GitHubStatsSchema = new mongoose.Schema({
     }
 });
 
+// Remove these duplicate index calls or keep only one method
+// Method 1: Using schema.index()
 GitHubStatsSchema.index({ user: 1 });
 GitHubStatsSchema.index({ totalStars: -1 });
 GitHubStatsSchema.index({ contributions: -1 });
