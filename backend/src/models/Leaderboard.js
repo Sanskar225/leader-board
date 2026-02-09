@@ -1,3 +1,4 @@
+// src/models/Leaderboard.js - UPDATED
 const mongoose = require('mongoose');
 
 const LeaderboardSchema = new mongoose.Schema({
@@ -40,7 +41,7 @@ const LeaderboardSchema = new mongoose.Schema({
     }
 });
 
-// Compound indexes for performance
+// Compound indexes
 LeaderboardSchema.index({ totalScore: -1 });
 LeaderboardSchema.index({ rank: 1 });
 LeaderboardSchema.index({ user: 1 });
@@ -48,7 +49,7 @@ LeaderboardSchema.index({ lastUpdated: -1 });
 
 LeaderboardSchema.pre('save', function(next) {
     if (this.previousRank && this.rank) {
-        this.rankChange = this.previousRank - this.rank; // Positive = moved up
+        this.rankChange = this.previousRank - this.rank;
     }
     next();
 });

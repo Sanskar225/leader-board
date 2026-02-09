@@ -1,3 +1,4 @@
+// src/models/LeetCodeStats.js - UPDATED
 const mongoose = require('mongoose');
 
 const LeetCodeStatsSchema = new mongoose.Schema({
@@ -53,6 +54,7 @@ const LeetCodeStatsSchema = new mongoose.Schema({
     }
 });
 
+// Keep only schema.index() calls, remove index: true from schema definition
 LeetCodeStatsSchema.index({ user: 1 });
 LeetCodeStatsSchema.index({ totalSolved: -1 });
 LeetCodeStatsSchema.index({ ranking: 1 });
