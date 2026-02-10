@@ -59,4 +59,6 @@ LeetCodeStatsSchema.index({ user: 1 });
 LeetCodeStatsSchema.index({ totalSolved: -1 });
 LeetCodeStatsSchema.index({ ranking: 1 });
 
-module.exports = mongoose.model('LeetCodeStats', LeetCodeStatsSchema);
+module.exports =
+  mongoose.models.LeetCodeStats ||
+  mongoose.model('LeetCodeStats', LeetCodeStatsSchema);
