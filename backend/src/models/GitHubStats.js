@@ -58,4 +58,6 @@ GitHubStatsSchema.index({ user: 1 });
 GitHubStatsSchema.index({ totalStars: -1 });
 GitHubStatsSchema.index({ contributions: -1 });
 
-module.exports = mongoose.model('GitHubStats', GitHubStatsSchema);
+module.exports =
+  mongoose.models.GitHubStats ||
+  mongoose.model('GitHubStats', GitHubStatsSchema);
