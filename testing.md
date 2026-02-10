@@ -12,3 +12,4 @@ What is WORKING CORRECTLY
 
 github token karna hai abhi fir sabka testing sara firse karn hai 
 
+then backend complete optisium karn hai har ek file the backend with zero error karna hai
