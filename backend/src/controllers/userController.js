@@ -249,7 +249,7 @@ class UserController {
     async refreshStats(req, res) {
         try {
             const userId = req.user._id;
-            const { type = 'both' } = req.body;
+const type = req.body?.type || 'both';
 
             const profile = await Profile.findOne({ user: userId });
             
