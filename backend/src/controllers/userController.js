@@ -245,8 +245,89 @@ class UserController {
             });
         }
     }
-//refreahstats
+// Add this method to userController.js
 
+async refreshStats(req, res) {
+    try {
+        const userId = req.user._id;
+        const { type = 'both' } = req.body;
+
+        const profile = await Profile.findOne({ user: userId });
+        
+        if (!profile) {
+            return res.status(400).json({
+                success: false,
+                error: 'Profile not found. Please update your profile first.'
+            });
+        }
+
+        if ((type === 'both' || type === 'github') && !profile.githubUsername) {
+            return res.status(400).json({
+                success: false,
+                error: 'GitHub username not set in profile'
+            });
+        }
+
+        if ((type === 'both' || type === 'leetcode') && !profile.leetcodeUsername) {
+            return res.status(400).json({
+                success: false,
+                error: 'LeetCode username not set in profile'
+            });
+        }
+
+        const result = await RefreshService.refreshUserStats(
+            userId,
+            profile.githubUsername,
+            profile.leetcodeUsername,
+            type
+        );
+
+        if (!result.success) {
+            return res.status(400).json({
+                success: false,
+                error: result.error
+            });
+        }
+
+        // Notify via WebSocket about the refresh
+        if (global.wsService) {
+            global.wsService.broadcastToRoom(`user_${userId}`, {
+                type: 'stats_refreshed',
+                data: result,
+                timestamp: new Date().toISOString()
+            });
+
+            // If rank changed, notify leaderboard room
+            const oldEntry = await Leaderboard.findOne({ user: userId });
+            const newEntry = await ScoringService.updateUserScores(userId);
+            
+            if (oldEntry && newEntry && oldEntry.rank !== newEntry.rank) {
+                global.wsService.notifyLeaderboardChange({
+                    userId,
+                    oldRank: oldEntry.rank,
+                    newRank: newEntry.rank,
+                    scoreChange: newEntry.totalScore - oldEntry.totalScore
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Stats refreshed successfully',
+            data: {
+                duration: result.duration,
+                refreshedAt: new Date()
+            }
+        });
+
+    } catch (error) {
+        console.error('Refresh stats error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to refresh stats'
+        });
+    }
+}
     async getLeaderboard(req, res) {
         try {
             const { page = 1, limit = 20, sort = 'rank', search = '' } = req.query;
