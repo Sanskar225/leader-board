@@ -1,56 +1,60 @@
 const Leaderboard = require('../models/Leaderboard');
 const User = require('../models/User');
+const GitHubStats = require('../models/GitHubStats');
+const LeetCodeStats = require('../models/LeetCodeStats');
 const ScoringService = require('../services/ScoringService');
 
 class LeaderboardController {
+    // ✅ FIX: Enhanced getLeaderboard with better filtering and pagination
     async getLeaderboard(req, res) {
         try {
             const {
                 page = 1,
-                limit = 50,
+                limit = 20,
                 sortBy = 'rank',
                 order = 'asc',
                 search = '',
+                platform = 'all',
                 minScore = 0,
-                maxScore = 1000000,
-                timeRange = 'all'
+                maxScore = 1000000
             } = req.query;
 
-            const pageNumber = parseInt(page);
-            const limitNumber = parseInt(limit);
+            const pageNumber = Math.max(1, parseInt(page));
+            const limitNumber = Math.min(100, Math.max(1, parseInt(limit)));
             const skip = (pageNumber - 1) * limitNumber;
 
+            // Build filter
             let filter = {
-                totalScore: { $gte: parseInt(minScore), $lte: parseInt(maxScore) }
+                totalScore: { 
+                    $gte: parseInt(minScore), 
+                    $lte: parseInt(maxScore) 
+                }
             };
 
-            if (timeRange !== 'all') {
-                let days = 7;
-                if (timeRange === 'monthly') days = 30;
-                
-                const dateThreshold = new Date();
-                dateThreshold.setDate(dateThreshold.getDate() - days);
-                
-                filter.lastUpdated = { $gte: dateThreshold };
+            // ✅ FIX: Add platform filtering
+            if (platform === 'leetcode') {
+                filter.leetCodeScore = { $gt: 0 };
+            } else if (platform === 'github') {
+                filter.githubScore = { $gt: 0 };
             }
 
+            // Search by username
+            let userIds = [];
             if (search) {
                 const users = await User.find({
                     username: { $regex: search, $options: 'i' }
                 }).select('_id');
-                
-                filter.user = { $in: users.map(u => u._id) };
+                userIds = users.map(u => u._id);
+                filter.user = { $in: userIds };
             }
 
-            const sortOrder = order === 'desc' ? -1 : 1;
-            const sort = { [sortBy]: sortOrder };
-
-            if (sortBy === 'rank' && order === 'desc') {
-                sort.rank = -1;
-            }
-
+            // Get total count
             const total = await Leaderboard.countDocuments(filter);
 
+            // Get leaderboard entries
+            const sortOrder = order === 'desc' ? -1 : 1;
+            const sort = { [sortBy]: sortOrder };
+            
             const leaderboard = await Leaderboard.find(filter)
                 .populate('user', 'username avatar email createdAt')
                 .sort(sort)
@@ -58,25 +62,33 @@ class LeaderboardController {
                 .limit(limitNumber)
                 .lean();
 
+            // ✅ FIX: Add rank change calculation
             const enrichedLeaderboard = leaderboard.map((entry, index) => ({
                 ...entry,
-                percentile: total > 0 ? Math.round(((total - (skip + index + 1)) / total) * 100 * 100) / 100 : 0
+                rank: skip + index + 1,
+                rankChange: entry.previousRank ? entry.previousRank - (skip + index + 1) : 0,
+                percentile: total > 0 
+                    ? Math.round(((total - (skip + index + 1)) / total) * 100 * 100) / 100 
+                    : 0
             }));
 
-            let currentUserPosition = null;
+            // Get current user's position
+            let currentUser = null;
             if (req.user) {
                 const userEntry = await Leaderboard.findOne({ user: req.user._id });
                 if (userEntry) {
                     const rankAbove = await Leaderboard.countDocuments({
                         totalScore: { $gt: userEntry.totalScore }
                     });
-                    currentUserPosition = {
-                        rank: userEntry.rank,
+                    currentUser = {
+                        userId: req.user._id,
+                        username: req.user.username,
+                        rank: rankAbove + 1,
                         totalScore: userEntry.totalScore,
-                        position: rankAbove + 1,
                         percentile: total > 0 
-                            ? Math.round(((total - userEntry.rank) / total) * 100 * 100) / 100 
-                            : 0
+                            ? Math.round(((total - (rankAbove + 1)) / total) * 100 * 100) / 100 
+                            : 0,
+                        rankChange: userEntry.rankChange
                     };
                 }
             }
@@ -89,18 +101,19 @@ class LeaderboardController {
                         page: pageNumber,
                         limit: limitNumber,
                         total,
-                        pages: Math.ceil(total / limitNumber)
+                        pages: Math.ceil(total / limitNumber),
+                        hasNext: pageNumber < Math.ceil(total / limitNumber),
+                        hasPrev: pageNumber > 1
                     },
-                    currentUser: currentUserPosition,
+                    currentUser,
                     filters: {
+                        search,
                         sortBy,
                         order,
-                        search,
+                        platform,
                         minScore,
-                        maxScore,
-                        timeRange
-                    },
-                    updatedAt: new Date()
+                        maxScore
+                    }
                 }
             });
 
@@ -113,19 +126,29 @@ class LeaderboardController {
         }
     }
 
+    // ✅ NEW: Get top 3 performers for podium
     async getTopPerformers(req, res) {
         try {
-            const limit = parseInt(req.query.limit) || 10;
+            const limit = parseInt(req.query.limit) || 3;
 
-            const topPerformers = await Leaderboard.find({})
+            const topPerformers = await Leaderboard.find({
+                totalScore: { $gt: 0 }
+            })
                 .populate('user', 'username avatar')
                 .sort({ totalScore: -1 })
                 .limit(limit)
                 .lean();
 
+            // Calculate rank changes for top performers
+            const enriched = topPerformers.map((performer, index) => ({
+                ...performer,
+                rank: index + 1,
+                rankChange: performer.previousRank ? performer.previousRank - (index + 1) : 0
+            }));
+
             res.json({
                 success: true,
-                data: topPerformers
+                data: enriched
             });
 
         } catch (error) {
@@ -137,102 +160,103 @@ class LeaderboardController {
         }
     }
 
-    async getUserRank(req, res) {
+    // ✅ NEW: Get user comparison data
+    async compareUsers(req, res) {
         try {
-            const userId = req.params.userId || req.user._id;
+            const { userId1, userId2 } = req.params;
 
-            const userEntry = await Leaderboard.findOne({ user: userId })
-                .populate('user', 'username avatar');
+            const [user1, user2] = await Promise.all([
+                Leaderboard.findOne({ user: userId1 }).populate('user', 'username avatar'),
+                Leaderboard.findOne({ user: userId2 }).populate('user', 'username avatar')
+            ]);
 
-            if (!userEntry) {
-                return res.status(404).json({
-                    success: false,
-                    error: 'User not found on leaderboard'
-                });
-            }
+            const [github1, github2] = await Promise.all([
+                GitHubStats.findOne({ user: userId1 }),
+                GitHubStats.findOne({ user: userId2 })
+            ]);
 
-            const rankAbove = await Leaderboard.countDocuments({
-                totalScore: { $gt: userEntry.totalScore }
-            });
-
-            const rankBelow = await Leaderboard.countDocuments({
-                totalScore: { $lt: userEntry.totalScore }
-            });
-
-            const totalUsers = await Leaderboard.countDocuments();
+            const [leetcode1, leetcode2] = await Promise.all([
+                LeetCodeStats.findOne({ user: userId1 }),
+                LeetCodeStats.findOne({ user: userId2 })
+            ]);
 
             res.json({
                 success: true,
                 data: {
-                    ...userEntry.toObject(),
-                    rankAbove,
-                    rankBelow,
-                    totalUsers,
-                    percentile: totalUsers > 0 
-                        ? Math.round(((totalUsers - userEntry.rank) / totalUsers) * 100 * 100) / 100 
-                        : 0,
-                    context: {
-                        isTop10: userEntry.rank <= 10,
-                        isTop100: userEntry.rank <= 100,
-                        isTop10Percent: userEntry.rank <= totalUsers * 0.1
+                    user1: {
+                        profile: user1,
+                        github: github1,
+                        leetcode: leetcode1
+                    },
+                    user2: {
+                        profile: user2,
+                        github: github2,
+                        leetcode: leetcode2
+                    },
+                    comparison: {
+                        scoreDiff: (user1?.totalScore || 0) - (user2?.totalScore || 0),
+                        rankDiff: (user2?.rank || 0) - (user1?.rank || 0),
+                        leetcodeDiff: (leetcode1?.totalSolved || 0) - (leetcode2?.totalSolved || 0),
+                        githubDiff: (github1?.totalStars || 0) - (github2?.totalStars || 0)
                     }
                 }
             });
 
         } catch (error) {
-            console.error('Get user rank error:', error);
+            console.error('Compare users error:', error);
             res.status(500).json({
                 success: false,
-                error: 'Failed to fetch user rank'
+                error: 'Failed to compare users'
             });
         }
     }
 
+    // ✅ NEW: Get leaderboard statistics for dashboard
     async getLeaderboardStats(req, res) {
         try {
-            const stats = await Leaderboard.aggregate([
-                {
-                    $group: {
-                        _id: null,
-                        totalUsers: { $sum: 1 },
-                        averageScore: { $avg: '$totalScore' },
-                        maxScore: { $max: '$totalScore' },
-                        minScore: { $min: '$totalScore' },
-                        totalLeetCodeScore: { $sum: '$leetCodeScore' },
-                        totalGitHubScore: { $sum: '$githubScore' }
-                    }
-                }
-            ]);
-
-            const distribution = await Leaderboard.aggregate([
-                {
-                    $bucket: {
-                        groupBy: '$totalScore',
-                        boundaries: [0, 100, 500, 1000, 2000, 5000, 10000, Infinity],
-                        default: 'Other',
-                        output: {
-                            count: { $sum: 1 }
+            const [
+                totalUsers,
+                totalScore,
+                averageScore,
+                topUser,
+                distribution
+            ] = await Promise.all([
+                Leaderboard.countDocuments(),
+                Leaderboard.aggregate([
+                    { $group: { _id: null, total: { $sum: '$totalScore' } } }
+                ]),
+                Leaderboard.aggregate([
+                    { $group: { _id: null, avg: { $avg: '$totalScore' } } }
+                ]),
+                Leaderboard.findOne()
+                    .populate('user', 'username avatar')
+                    .sort({ totalScore: -1 }),
+                Leaderboard.aggregate([
+                    {
+                        $bucket: {
+                            groupBy: '$totalScore',
+                            boundaries: [0, 100, 500, 1000, 2000, 5000, 10000],
+                            default: '10000+',
+                            output: {
+                                count: { $sum: 1 }
+                            }
                         }
                     }
-                }
+                ])
             ]);
-
-            const topUsers = await Leaderboard.find({})
-                .populate('user', 'username avatar')
-                .sort({ totalScore: -1 })
-                .limit(3)
-                .lean();
-
-            const result = {
-                overall: stats[0] || {},
-                distribution,
-                topUsers,
-                updatedAt: new Date()
-            };
 
             res.json({
                 success: true,
-                data: result
+                data: {
+                    totalUsers,
+                    totalScore: totalScore[0]?.total || 0,
+                    averageScore: Math.round(averageScore[0]?.avg || 0),
+                    topUser: topUser ? {
+                        username: topUser.user?.username,
+                        score: topUser.totalScore
+                    } : null,
+                    distribution
+                }
             });
 
         } catch (error) {
@@ -240,37 +264,6 @@ class LeaderboardController {
             res.status(500).json({
                 success: false,
                 error: 'Failed to fetch leaderboard stats'
-            });
-        }
-    }
-
-    async refreshRanks(req, res) {
-        try {
-            if (req.user.role !== 'admin') {
-                return res.status(403).json({
-                    success: false,
-                    error: 'Only admins can refresh ranks'
-                });
-            }
-
-            const startTime = Date.now();
-            const count = await ScoringService.updateAllRanks();
-            const duration = Date.now() - startTime;
-
-            res.json({
-                success: true,
-                message: `Refreshed ranks for ${count} users`,
-                data: {
-                    count,
-                    duration: `${duration}ms`
-                }
-            });
-
-        } catch (error) {
-            console.error('Refresh ranks error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Failed to refresh ranks'
             });
         }
     }
