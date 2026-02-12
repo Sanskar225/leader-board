@@ -245,66 +245,7 @@ class UserController {
             });
         }
     }
-
-    async refreshStats(req, res) {
-        try {
-            const userId = req.user._id;
-const type = req.body?.type || 'both';
-
-            const profile = await Profile.findOne({ user: userId });
-            
-            if (!profile) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Profile not found. Please update your profile first.'
-                });
-            }
-
-            if ((type === 'both' || type === 'github') && !profile.githubUsername) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'GitHub username not set in profile'
-                });
-            }
-
-            if ((type === 'both' || type === 'leetcode') && !profile.leetcodeUsername) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'LeetCode username not set in profile'
-                });
-            }
-
-            const result = await RefreshService.refreshUserStats(
-                userId,
-                profile.githubUsername,
-                profile.leetcodeUsername,
-                type
-            );
-
-            if (!result.success) {
-                return res.status(400).json({
-                    success: false,
-                    error: result.error
-                });
-            }
-
-            res.json({
-                success: true,
-                message: 'Stats refreshed successfully',
-                data: {
-                    duration: result.duration,
-                    refreshedAt: new Date()
-                }
-            });
-
-        } catch (error) {
-            console.error('Refresh stats error:', error);
-            res.status(500).json({
-                success: false,
-                error: 'Failed to refresh stats'
-            });
-        }
-    }
+//refreahstats
 
     async getLeaderboard(req, res) {
         try {
