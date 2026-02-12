@@ -3,14 +3,17 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const http = require('http');
 require('dotenv').config();
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
 // Import configurations
 const connectDB = require('./config/database');
 const CronService = require('./services/CronService');
+const WebSocketService = require('./services/WebSocketService');
 
 // Middleware
 app.use(helmet());
@@ -31,6 +34,7 @@ app.get('/', (req, res) => {
     res.json({ 
         message: 'CodeRanker API is running!',
         version: '1.0.0',
+        websocket: 'ws://localhost:3001',
         endpoints: {
             auth: '/api/auth',
             users: '/api/users',
@@ -44,11 +48,16 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        websocket: 'active'
     });
 });
 
-// Start cron jobs (only in production or explicitly enabled)
+// Initialize WebSocket
+const wsService = new WebSocketService(server);
+global.wsService = wsService; // Make accessible to controllers
+
+// Start cron jobs
 if (process.env.NODE_ENV === 'production' || process.env.ENABLE_CRON === 'true') {
     CronService.start();
 }
@@ -63,13 +72,14 @@ app.use((err, req, res, next) => {
 });
 
 // 404 handler
-app.use((req, res) => {
+app.use('*', (req, res) => {
     res.status(404).json({ error: 'Endpoint not found' });
 });
 
 // Start server
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📡 WebSocket server running on ws://localhost:${PORT}`);
     console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
@@ -86,4 +96,4 @@ process.on('SIGTERM', () => {
     });
 });
 
-module.exports = app;
+module.exports = { app, server };
