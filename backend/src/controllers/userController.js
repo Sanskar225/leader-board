@@ -12,6 +12,7 @@ const {
     validateLeetCodeUsername
 } = require('../utils/validators');
 const RefreshService = require('../services/RefreshService');
+const ScoringService = require('../services/ScoringService'); // ✅ FIX ADDED
 
 class UserController {
     async register(req, res) {
