@@ -1,3 +1,5 @@
+const mongoose = require('mongoose');
+
 const Leaderboard = require('../models/Leaderboard');
 const User = require('../models/User');
 const GitHubStats = require('../models/GitHubStats');
@@ -156,48 +158,59 @@ class LeaderboardController {
     // ==============================
     // GET SINGLE USER RANK
     // ==============================
-    async getUserRank(req, res) {
-        try {
-            const { userId } = req.params;
+   // ==============================
+// GET SINGLE USER RANK
+// ==============================
+async getUserRank(req, res) {
+    try {
+        const { userId } = req.params;
 
-            const totalUsers = await Leaderboard.countDocuments();
-
-            const userEntry = await Leaderboard.findOne({ user: userId })
-                .populate('user', 'username avatar email');
-
-            if (!userEntry) {
-                return res.status(404).json({
-                    success: false,
-                    error: 'User not found in leaderboard'
-                });
-            }
-
-            const usersAbove = await Leaderboard.countDocuments({
-                totalScore: { $gt: userEntry.totalScore }
+        // ✅ FIX: Validate ObjectId before querying
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid user ID'
             });
-
-            const rank = usersAbove + 1;
-
-            res.json({
-                success: true,
-                data: {
-                    user: userEntry.user,
-                    totalScore: userEntry.totalScore,
-                    rank,
-                    percentile: totalUsers > 0
-                        ? Math.round(((totalUsers - rank) / totalUsers) * 10000) / 100
-                        : 0,
-                    rankChange: userEntry.previousRank
-                        ? userEntry.previousRank - rank
-                        : 0
-                }
-            });
-
-        } catch (error) {
-            console.error('Get user rank error:', error);
-            res.status(500).json({ success: false, error: 'Failed to fetch user rank' });
         }
+
+        const totalUsers = await Leaderboard.countDocuments();
+
+        const userEntry = await Leaderboard.findOne({ user: userId })
+            .populate('user', 'username avatar email');
+
+        if (!userEntry) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found in leaderboard'
+            });
+        }
+
+        const usersAbove = await Leaderboard.countDocuments({
+            totalScore: { $gt: userEntry.totalScore }
+        });
+
+        const rank = usersAbove + 1;
+
+        res.json({
+            success: true,
+            data: {
+                user: userEntry.user,
+                totalScore: userEntry.totalScore,
+                rank,
+                percentile: totalUsers > 0
+                    ? Math.round(((totalUsers - rank) / totalUsers) * 10000) / 100
+                    : 0,
+                rankChange: userEntry.previousRank
+                    ? userEntry.previousRank - rank
+                    : 0
+            }
+        });
+
+    } catch (error) {
+        console.error('Get user rank error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch user rank' });
     }
+}
 
     // ==============================
     // COMPARE USERS
