@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import * as anime from 'animejs'
+import anime from 'animejs'
 
 export const useScrollAnimation = (onComplete) => {
   const timelineRef = useRef(null)
