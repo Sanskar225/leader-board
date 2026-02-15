@@ -4,6 +4,11 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+
+  optimizeDeps: {
+    include: ['animejs']
+  },
+
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -16,6 +21,7 @@ export default defineConfig({
       '@utils': path.resolve(__dirname, './src/utils'),
     },
   },
+
   server: {
     port: 3000,
     open: true,
@@ -26,6 +32,7 @@ export default defineConfig({
       },
     },
   },
+
   build: {
     outDir: 'dist',
     sourcemap: false,
