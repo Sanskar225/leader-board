@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWindowSize } from '@hooks/useWindowSize'
-import { FixedSizeList as List } from 'react-window'
+import { FixedSizeList } from 'react-window'
 import LeaderboardRow from './LeaderboardRow'
 
 const LeaderboardTable = ({ entries }) => {
@@ -19,14 +19,15 @@ const LeaderboardTable = ({ entries }) => {
 
   if (entries.length > 100) {
     return (
-      <List
+      <FixedSizeList
+
         height={listHeight}
         itemCount={entries.length}
         itemSize={rowHeight}
         width="100%"
       >
         {Row}
-      </List>
+      </FixedSizeList>
     )
   }
 
