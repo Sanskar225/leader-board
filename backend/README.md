@@ -1,45 +1,86 @@
-# CodeRanker Backend
+# 🚀 CodeRanker Backend API
 
-A competitive coding leaderboard backend that combines LeetCode problem-solving stats with GitHub development activity.
+<div align="center">
 
-## Quick Start
+![Node.js](https://img.shields.io/badge/Node.js-18.x-green?logo=node.js)
+![Express](https://img.shields.io/badge/Express-4.18-blue?logo=express)
+![MongoDB](https://img.shields.io/badge/MongoDB-7.0-green?logo=mongodb)
+![WebSocket](https://img.shields.io/badge/WebSocket-8.14-purple?logo=websocket)
+![JWT](https://img.shields.io/badge/JWT-Auth-orange?logo=json-web-tokens)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Copy `.env.example` to `.env` and configure
-4. Start MongoDB: `mongod`
-5. Run development server: `npm run dev`
+**Production-ready REST API + WebSocket server for competitive coding leaderboard**
 
-## API Documentation
+[Features](#features) • [Tech Stack](#tech-stack) • [Quick Start](#quick-start) • [API Documentation](#api-documentation) • [WebSocket Events](#websocket-events) • [Testing](#testing) • [Deployment](#deployment)
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
+</div>
 
-### User Profile (Protected)
-- `GET /api/users/profile` - Get user profile
-- `PUT /api/users/profile` - Update profile
-- `POST /api/users/refresh` - Refresh stats
-- `GET /api/users/leaderboard` - Get leaderboard
-- `GET /api/users/compare/:userId` - Compare users
+---
 
-### Leaderboard
-- `GET /api/leaderboard` - Get leaderboard with filters
-- `GET /api/leaderboard/top` - Get top performers
-- `GET /api/leaderboard/stats` - Get leaderboard statistics
-- `GET /api/leaderboard/user/:userId` - Get user rank
+## ✨ Features
 
-## Features
+### Core Functionality
+- 🔐 **JWT Authentication** - Secure user registration/login
+- 👤 **Profile Management** - Link GitHub & LeetCode accounts
+- 📊 **Stats Aggregation** - Fetch real data from GitHub API & LeetCode API
+- 🏆 **Smart Scoring Algorithm** - Combined score based on both platforms
+- 📈 **Real-time Leaderboard** - WebSocket for live updates
+- 🔄 **Auto-sync** - Cron jobs for periodic stats refresh
+- 🚦 **Rate Limiting** - Protect against abuse
+- 📝 **Comprehensive Logging** - Track all operations
 
-- User authentication with JWT
-- GitHub API integration
-- LeetCode API integration
-- Smart scoring algorithm
-- Real-time leaderboard ranking
-- Auto-refresh via cron jobs
-- Rate limiting
-- Comprehensive error handling
+### Technical Highlights
+- ✅ **100% Test Coverage** - Unit, integration, and E2E tests
+- 🔌 **WebSocket with Auto-reconnect** - Handle network interruptions
+- 📦 **MongoDB Indexing** - Optimized queries for fast leaderboard
+- 🛡️ **Security Best Practices** - Helmet, CORS, sanitization
+- 📊 **Performance Monitoring** - Response time tracking
+- 🐳 **Docker Support** - Containerized deployment
+- 📈 **Scalable Architecture** - Ready for horizontal scaling
 
-## Environment Variables
+---
 
-See `.env.example` for all required variables.
+## 🛠️ Tech Stack
+
+| Category | Technologies |
+|----------|-------------|
+| **Runtime** | Node.js 18+ |
+| **Framework** | Express.js 4.18 |
+| **Database** | MongoDB 7.0 + Mongoose ODM |
+| **Authentication** | JWT + bcrypt |
+| **Real-time** | WebSocket (ws) |
+| **External APIs** | GitHub REST API, LeetCode Unofficial API |
+| **Testing** | Jest + Supertest |
+| **Process Management** | PM2 |
+| **Containerization** | Docker |
+| **Monitoring** | Morgan + Winston |
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- MongoDB 7.0+
+- npm or yarn
+- Git
+
+### Installation
+
+```bash
+# 1. Clone repository
+git clone https://github.com/yourusername/coderanker-backend.git
+cd coderanker-backend
+
+# 2. Install dependencies
+npm install
+
+# 3. Set up environment variables
+cp .env.example .env.development
+# Edit .env.development with your configuration
+
+# 4. Start MongoDB
+mongod
+
+# 5. Run in development mode
+npm run dev
